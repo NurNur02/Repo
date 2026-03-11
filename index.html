@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель преподавателя</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            margin: 0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1, h2, h3 {
+            color: #1e293b;
+        }
+        .teacher-panel {
+            background: #fff7e6;
+            border-radius: 24px;
+            padding: 20px;
+            border: 2px solid #fbbf24;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        th {
+            background: #fbbf24;
+            color: #1e293b;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .reset-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .reset-btn:hover {
+            background: #dc2626;
+        }
+        .upload-section {
+            background: #f1f5f9;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            padding: 10px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 40px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .test-editor {
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .question-block {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #e2e8f0;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👨‍🏫 Панель преподавателя</h1>
+        
+        <!-- Статус загрузки -->
+        <div id="loading" class="loading" style="display: none;">⏳ Загрузка...</div>
+        
+        <!-- Сообщения -->
+        <div id="message" class="message" style="display: none;"></div>
+
+        <!-- Секция: Попытки студентов -->
+        <div class="teacher-panel">
+            <h2>📋 Журнал попыток</h2>
+            <button onclick="loadAttempts()">🔄 Обновить список</button>
+            <table id="attemptsTable">
+                <thead>
+                    <tr>
+                        <th>ID студента</th>
+                        <th>Начало</th>
+                        <th>Окончание</th>
+                        <th>Результат</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="attemptsBody">
+                    <tr><td colspan="5">Нет данных</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Секция: Загрузка PDF -->
+        <div class="upload-section">
+            <h3>📎 Загрузить задание (PDF)</h3>
+            <input type="file" id="pdfFile" accept=".pdf">
+            <button onclick="uploadPdf()">📤 Загрузить</button>
+            <div id="pdfList"></div>
+        </div>
+
+        <!-- Секция: Редактор тестов -->
+        <div class="test-editor">
+            <h3>✏️ Редактор тестов</h3>
+            <button onclick="loadTest()">📥 Загрузить текущий тест</button>
+            <button onclick="saveTest()">💾 Сохранить тест</button>
+            
+            <div id="testEditor">
+                <!-- Здесь будут вопросы для редактирования -->
+                <p>Нажмите "Загрузить текущий тест" для редактирования</p>
+            </div>
+        </div>
+
+        <!-- Секция: Создать новый тест -->
+        <div style="margin-top: 20px;">
+            <h3>➕ Создать новый тест</h3>
+            <button onclick="createNewTest()">🆕 Новый тест</button>
+            <button onclick="addQuestion()">➕ Добавить вопрос</button>
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация API
+        const firebaseConfig = {
+  apiKey: "AIzaSyD8zzNliFbyYfRIPdUKxwOKKgs-CtSldOo",
+  authDomain: "moon-baaa3.firebaseapp.com",
+  projectId: "moon-baaa3",
+  storageBucket: "moon-baaa3.firebasestorage.app",
+  messagingSenderId: "342563471974",
+  appId: "1:342563471974:web:93cc854cc91547223563a7"
+};
+        
+        let currentTest = null;
+
+        // Показать сообщение
+        function showMessage(text, type = 'success') {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+            msg.style.display = 'block';
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 3000);
+        }
+
+        // Загрузка попыток
+        async function loadAttempts() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_URL}/get_attempts.php`);
+                const attempts = await response.json();
+                
+                const tbody = document.getElementById('attemptsBody');
+                if (attempts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5">Нет попыток</td></tr>';
+                } else {
+                    tbody.innerHTML = attempts.map(attempt => `
+                        <tr>
+                            <td>${attempt.student_id}</td>
+                            <td>${attempt.start_time || '—'}</td>
+                            <td>${attempt.end_time || '—'}</td>
+                            <td>${attempt.completed ? `${attempt.score}/${attempt.total} (${Math.round(attempt.score/attempt.total*100)}%)` : 'В процессе'}</td>
+                            <td>
+                                ${attempt.completed ? 
+                                    `<button class="reset-btn" onclick="resetAttempt(${attempt.student_id})">🔄 Сбросить</button>` : 
+                                    '—'}
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showMessage('Ошибка загрузки попыток', 'error');
+                // Демо-данные
+                document.getElementById('attemptsBody').innerHTML = `
+                    <tr>
+                        <td>123</td>
+                        <td>10:30</td>
+                        <td>10:35</td>
+                        <td>4/5 (80%)</td>
+                        <td><button class="reset-btn" onclick="resetAttempt(123)">🔄 Сбросить</button></td>
+                    </tr>
+                    <tr>
+                        <td>456</td>
+                        <td>11:15</td>
+                        <td>—</td>
+                        <td>В процессе</td>
+                        <td>—</td>
+                    </tr>
+                `;
+            }
+            
+            loading.style.display = 'none';
+        }
+
+        // Сброс попытки
+        async function resetAttempt(studentId) {
+            if (!confirm(`Сбросить попытку студента ${studentId}?`)) return;
+            
+            try {
+                await fetch(`${API_URL}/reset_attempt.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId })
+                });
+                showMessage(`Попытка студента ${studentId} сброшена`);
+                loadAttempts();
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showMessage('Ошибка сброса (демо-режим)', 'error');
+                // В демо-режиме просто обновляем таблицу
+                loadAttempts();
+            }
+        }
+
+        // Загрузка PDF
+        async function uploadPdf() {
+            const fileInput = document.getElementById('pdfFile');
+            if (!fileInput.files[0]) {
+                showMessage('Выберите файл', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('pdf', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_URL}/upload_pdf.php`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                showMessage('PDF загружен: ' + result.filename);
+                updatePdfList();
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showMessage('PDF загружен (демо)', 'success');
+                document.getElementById('pdfList').innerHTML = `
+                    <p>📄 Загружен: ${fileInput.files[0].name}</p>
+                `;
+            }
+        }
+
+        // Обновление списка PDF
+        async function updatePdfList() {
+            // В реальном API здесь запрос списка файлов
+        }
+
+        // Загрузка текущего теста для редактирования
+        async function loadTest() {
+            try {
+                const response = await fetch(`${API_URL}/get_test.php`);
+                currentTest = await response.json();
+                renderTestEditor();
+            } catch (error) {
+                console.error('Ошибка:', error);
+                // Демо-тест
+                currentTest = {
+                    theory: 'Теория по умолчанию',
+                    questions: [
+                        {
+                            type: 'choice',
+                            question: 'Вопрос 1',
+                            options: ['A', 'B', 'C', 'D'],
+                            correct: 0,
+                            explanation: 'Пояснение'
+                        }
+                    ]
+                };
+                renderTestEditor();
+            }
+        }
+
+        // Отрисовка редактора тестов
+        function renderTestEditor() {
+            if (!currentTest) return;
+            
+            let html = `
+                <div class="question-block">
+                    <label>Теория:</label><br>
+                    <textarea id="theoryText" style="width:100%; height:100px; padding:10px;">${currentTest.theory || ''}</textarea>
+                </div>
+            `;
+            
+            currentTest.questions.forEach((q, idx) => {
+                html += `
+                    <div class="question-block">
+                        <h4>Вопрос ${idx + 1}</h4>
+                        <input type="text" id="q_${idx}_text" value="${q.question}" style="width:100%; padding:8px; margin:5px 0;">
+                        <select id="q_${idx}_type" onchange="changeQuestionType(${idx})">
+                            <option value="choice" ${q.type === 'choice' ? 'selected' : ''}>Выбор ответа</option>
+                            <option value="pair" ${q.type === 'pair' ? 'selected' : ''}>Соответствие</option>
+                        </select>
+                        <div id="q_${idx}_content"></div>
+                        <textarea id="q_${idx}_exp" placeholder="Объяснение" style="width:100%; padding:8px; margin:5px 0;">${q.explanation || ''}</textarea>
+                        <button onclick="removeQuestion(${idx})" style="background:#ef4444;">Удалить</button>
+                    </div>
+                `;
+            });
+            
+            html += `<button onclick="addQuestion()" style="margin-top:10px;">➕ Добавить вопрос</button>`;
+            
+            document.getElementById('testEditor').innerHTML = html;
+            
+            // Заполняем содержимое вопросов
+            currentTest.questions.forEach((q, idx) => {
+                renderQuestionContent(idx, q);
+            });
+        }
+
+        // Отрисовка содержимого вопроса
+        function renderQuestionContent(idx, q) {
+            const container = document.getElementById(`q_${idx}_content`);
+            if (!container) return;
+            
+            if (q.type === 'choice') {
+                let html = '<p>Варианты ответа:</p>';
+                q.options.forEach((opt, optIdx) => {
+                    html += `
+                        <div style="margin:5px 0;">
+                            <input type="text" id="q_${idx}_opt_${optIdx}" value="${opt}" style="width:200px; padding:5px;">
+                            <label>
+                                <input type="radio" name="q_${idx}_correct" value="${optIdx}" ${q.correct === optIdx ? 'checked' : ''}>
+                                Правильный
+                            </label>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else if (q.type === 'pair') {
+                let html = '<p>Пары (лево → право):</p>';
+                q.pairs.forEach((pair, pairIdx) => {
+                    html += `
+                        <div style="margin:10px 0; display:flex; gap:10px;">
+                            <input type="text" id="q_${idx}_left_${pairIdx}" value="${pair.left}" placeholder="Левый термин" style="flex:1; padding:5px;">
+                            <input type="text" id="q_${idx}_right_${pairIdx}" value="${pair.right}" placeholder="Правый термин" style="flex:1; padding:5px;">
+                            <button onclick="removePair(${idx}, ${pairIdx})" style="background:#ef4444; padding:5px 10px;">✕</button>
+                        </div>
+                    `;
+                });
+                html += `<button onclick="addPair(${idx})">➕ Добавить пару</button>`;
+                container.innerHTML = html;
+            }
+        }
+
+        // Изменение типа вопроса
+        function changeQuestionType(idx) {
+            const type = document.getElementById(`q_${idx}_type`).value;
+            if (!currentTest.questions[idx]) return;
+            
+            if (type === 'choice') {
+                currentTest.questions[idx] = {
+                    type: 'choice',
+                    question: currentTest.questions[idx].question || 'Новый вопрос',
+                    options: ['Вариант 1', 'Вариант 2', 'Вариант 3', 'Вариант 4'],
+                    correct: 0,
+                    explanation: ''
+                };
+            } else {
+                currentTest.questions[idx] = {
+                    type: 'pair',
+                    question: currentTest.questions[idx].question || 'Новый вопрос',
+                    pairs: [
+                        { left: 'Термин 1', right: 'Определение 1' },
+                        { left: 'Термин 2', right: 'Определение 2' }
+                    ],
+                    correctMap: { 0: 0, 1: 1 },
+                    explanation: ''
+                };
+            }
+            renderTestEditor();
+        }
+
+        // Добавить вопрос
+        function addQuestion() {
+            if (!currentTest) {
+                currentTest = { theory: '', questions: [] };
+            }
+            currentTest.questions.push({
+                type: 'choice',
+                question: 'Новый вопрос',
+                options: ['A', 'B', 'C', 'D'],
+                correct: 0,
+                explanation: ''
+            });
+            renderTestEditor();
+        }
+
+        // Удалить вопрос
+        function removeQuestion(idx) {
+            currentTest.questions.splice(idx, 1);
+            renderTestEditor();
+        }
+
+        // Добавить пару
+        function addPair(qIdx) {
+            const q = currentTest.questions[qIdx];
+            if (q && q.type === 'pair') {
+                const newIdx = q.pairs.length;
+                q.pairs.push({ left: 'Новый термин', right: 'Новое определение' });
+                q.correctMap[newIdx] = newIdx;
+                renderQuestionContent(qIdx, q);
+            }
+        }
+
+        // Удалить пару
+        function removePair(qIdx, pairIdx) {
+            const q = currentTest.questions[qIdx];
+            if (q && q.type === 'pair') {
+                q.pairs.splice(pairIdx, 1);
+                // Обновляем correctMap
+                const newMap = {};
+                Object.keys(q.correctMap).forEach(key => {
+                    const val = q.correctMap[key];
+                    if (parseInt(key) < pairIdx) newMap[key] = val;
+                    else if (parseInt(key) > pairIdx) newMap[key-1] = val;
+                });
+                q.correctMap = newMap;
+                renderQuestionContent(qIdx, q);
+            }
+        }
+
+        // Сохранить тест
+        async function saveTest() {
+            // Собираем данные из формы
+            currentTest.theory = document.getElementById('theoryText')?.value || '';
+            
+            currentTest.questions.forEach((q, idx) => {
+                q.question = document.getElementById(`q_${idx}_text`)?.value || q.question;
+                q.explanation = document.getElementById(`q_${idx}_exp`)?.value || '';
+                
+                if (q.type === 'choice') {
+                    q.options = [];
+                    for (let i = 0; i < 4; i++) {
+                        const optEl = document.getElementById(`q_${idx}_opt_${i}`);
+                        if (optEl) q.options[i] = optEl.value;
+                    }
+                    const correctRadio = document.querySelector(`input[name="q_${idx}_correct"]:checked`);
+                    if (correctRadio) q.correct = parseInt(correctRadio.value);
+                } else if (q.type === 'pair') {
+                    q.pairs.forEach((pair, pairIdx) => {
+                        const leftEl = document.getElementById(`q_${idx}_left_${pairIdx}`);
+                        const rightEl = document.getElementById(`q_${idx}_right_${pairIdx}`);
+                        if (leftEl) pair.left = leftEl.value;
+                        if (rightEl) pair.right = rightEl.value;
+                    });
+                }
+            });
+
+            try {
+                const response = await fetch(`${API_URL}/save_test.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentTest)
+                });
+                showMessage('Тест сохранен');
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showMessage('Тест сохранен (демо)', 'success');
+            }
+        }
+
+        // Создать новый тест
+        function createNewTest() {
+            currentTest = {
+                theory: 'Введите теорию здесь...',
+                questions: []
+            };
+            renderTestEditor();
+        }
+
+        // Загружаем попытки при открытии страницы
+        loadAttempts();
+    </script>
+</body>
+</html>
